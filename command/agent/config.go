@@ -738,6 +738,33 @@ type Config struct {
 	DeprecatedAtlasEndpoint       string `mapstructure:"atlas_endpoint" json:"-"`
 }
 
+// HTTPAddrs returns a list of addresses the HTTP endpoint should bind to.
+// The format of the entries are <proto>+<network>://<addr>
+//
+// Examples:
+//
+//    http+tcp://1.2.3.4:8500
+//    https+tcp://1.2.3.4:8600
+//    http+unix:///path/to/socket
+func (c *Config) HTTPAddrs() ([]string, error) {
+	var addrs []string
+	if c.Ports.HTTP > 0 {
+		a, err := c.ClientListener(c.Addresses.HTTP, c.Ports.HTTP)
+		if err != nil {
+			return nil, err
+		}
+		addrs = append(addrs, fmt.Sprintf("%s+%s://%s", "http", a.Network(), a.String()))
+	}
+	if c.Ports.HTTPS > 0 {
+		a, err := c.ClientListener(c.Addresses.HTTPS, c.Ports.HTTPS)
+		if err != nil {
+			return nil, err
+		}
+		addrs = append(addrs, fmt.Sprintf("%s+%s://%s", "https", a.Network(), a.String()))
+	}
+	return addrs, nil
+}
+
 // Bool is used to initialize bool pointers in struct literals.
 func Bool(b bool) *bool {
 	return &b
@@ -889,13 +916,10 @@ func (c *Config) EncryptBytes() ([]byte, error) {
 // ClientListener is used to format a listener for a
 // port on a ClientAddr
 func (c *Config) ClientListener(override string, port int) (net.Addr, error) {
-	var addr string
+	addr := c.ClientAddr
 	if override != "" {
 		addr = override
-	} else {
-		addr = c.ClientAddr
 	}
-
 	if path := socketPath(addr); path != "" {
 		return &net.UnixAddr{Name: path, Net: "unix"}, nil
 	}
