@@ -1,4 +1,28 @@
+## 0.8.4 (UNRELEASED)
+
+FEATURES:
+
+IMPROVEMENTS:
+
+* agent: Added a check which prevents advertising or setting a service to a zero address (`0.0.0.0`, `[::]`, `::`). [GH-2961]
+* agent: Added a method for gracefully transitioning to TLS on an existing cluster. [GH-1705]
+* agent: Removed SCADA-related code for Atlas and deprecated all Atlas-related configuration options. [GH-3032]
+
+BUG FIXES:
+
+* build: Added a vendor fix to allow compilation on Illumos. [GH-3024]
+
+## 0.8.3 (May 12, 2017)
+
+BUG FIXES:
+
+* agent: Fixed an issue where NAT-configured agents with a non-routable advertise address would refuse to make RPC connections to Consul servers. This was a regression related to GH-2822 in Consul 0.8.2. [GH-3028]
+
 ## 0.8.2 (May 9, 2017)
+
+BREAKING CHANGES:
+
+* api: HttpClient now defaults to nil in the client config and will be generated if left blank. A NewHttpClient function has been added for creating an HttpClient with a custom Transport or TLS config. [GH-2922]
 
 IMPROVEMENTS:
 
@@ -21,8 +45,6 @@ BUG FIXES:
 * ui: Add and update favicons [GH-2945]
 
 ## 0.8.1 (April 17, 2017)
-
-FEATURES:
 
 IMPROVEMENTS:
 

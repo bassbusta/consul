@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -47,6 +48,52 @@ func TestValidDatacenter(t *testing.T) {
 		if validDatacenter.MatchString(m) {
 			t.Fatalf("expected no match: %s", m)
 		}
+	}
+}
+
+// TestConfigFail should test command line flags that lead to an immediate error.
+func TestConfigFail(t *testing.T) {
+	tests := []struct {
+		args []string
+		out  string
+	}{
+		{
+			args: []string{"agent", "-server", "-data-dir", "foo", "-advertise", "0.0.0.0"},
+			out:  "==> Advertise address cannot be 0.0.0.0\n",
+		},
+		{
+			args: []string{"agent", "-server", "-data-dir", "foo", "-advertise", "::"},
+			out:  "==> Advertise address cannot be ::\n",
+		},
+		{
+			args: []string{"agent", "-server", "-data-dir", "foo", "-advertise", "[::]"},
+			out:  "==> Advertise address cannot be [::]\n",
+		},
+		{
+			args: []string{"agent", "-server", "-data-dir", "foo", "-advertise-wan", "0.0.0.0"},
+			out:  "==> Advertise WAN address cannot be 0.0.0.0\n",
+		},
+		{
+			args: []string{"agent", "-server", "-data-dir", "foo", "-advertise-wan", "::"},
+			out:  "==> Advertise WAN address cannot be ::\n",
+		},
+		{
+			args: []string{"agent", "-server", "-data-dir", "foo", "-advertise-wan", "[::]"},
+			out:  "==> Advertise WAN address cannot be [::]\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
+			cmd := exec.Command("consul", tt.args...)
+			b, err := cmd.CombinedOutput()
+			if got, want := err, "exit status 1"; got == nil || got.Error() != want {
+				t.Fatalf("got err %q want %q", got, want)
+			}
+			if got, want := string(b), tt.out; got != want {
+				t.Fatalf("got %q want %q", got, want)
+			}
+		})
 	}
 }
 
@@ -359,50 +406,6 @@ func TestDiscoverGCEHosts(t *testing.T) {
 	}
 	if len(servers) != 3 {
 		t.Fatalf("bad: %v", servers)
-	}
-}
-
-func TestSetupScadaConn(t *testing.T) {
-	// Create a config and assign an infra name
-	conf1 := nextConfig()
-	conf1.AtlasInfrastructure = "hashicorp/test1"
-	conf1.AtlasToken = "abc"
-
-	dir, agent := makeAgent(t, conf1)
-	defer os.RemoveAll(dir)
-	defer agent.Shutdown()
-
-	cmd := &Command{
-		ShutdownCh: make(chan struct{}),
-		Command:    baseCommand(new(cli.MockUi)),
-		agent:      agent,
-	}
-
-	// First start creates the scada conn
-	if err := cmd.setupScadaConn(conf1); err != nil {
-		t.Fatalf("err: %s", err)
-	}
-	http1 := cmd.scadaHTTP
-	provider1 := cmd.scadaProvider
-
-	// Performing setup again tears down original and replaces
-	// with a new SCADA client.
-	conf2 := nextConfig()
-	conf2.AtlasInfrastructure = "hashicorp/test2"
-	conf2.AtlasToken = "123"
-	if err := cmd.setupScadaConn(conf2); err != nil {
-		t.Fatalf("err: %s", err)
-	}
-	if cmd.scadaHTTP == http1 || cmd.scadaProvider == provider1 {
-		t.Fatalf("should change: %#v %#v", cmd.scadaHTTP, cmd.scadaProvider)
-	}
-
-	// Original provider and listener must be closed
-	if !provider1.IsShutdown() {
-		t.Fatalf("should be shutdown")
-	}
-	if _, err := http1.listener.Accept(); !strings.Contains(err.Error(), "closed") {
-		t.Fatalf("should be closed")
 	}
 }
 
